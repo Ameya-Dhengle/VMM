@@ -1,15 +1,12 @@
 package com.vmm.test;
 
 import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 
 import android.app.Activity;
@@ -30,16 +27,15 @@ import android.net.http.SslError;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Base64;
-import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
-import android.webkit.ClientCertRequest;
+import android.view.View;
 import android.webkit.HttpAuthHandler;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
-import android.webkit.WebSettings;
-import android.webkit.WebSettings.RenderPriority;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.EditText;
 
 public class MainActivity extends Activity {
 
@@ -47,6 +43,10 @@ public class MainActivity extends Activity {
 	private long enqueue;
 	private DownloadManager dm;
 	ProgressDialog progressDialog;
+	Context context = this;
+
+	String username = null;
+	String password = null;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -60,12 +60,9 @@ public class MainActivity extends Activity {
 		mTestWebView.getSettings().setJavaScriptEnabled(true);
 		mTestWebView.getSettings().setJavaScriptCanOpenWindowsAutomatically(
 				true);
-		// web.getSettings().setSupportMultipleWindows(true);
 		mTestWebView.getSettings().setBuiltInZoomControls(true);
 		mTestWebView.getSettings().setSupportZoom(true);
-		mTestWebView.getSettings().setLightTouchEnabled(true);
 		mTestWebView.getSettings().setDomStorageEnabled(true);
-		mTestWebView.getSettings().setPluginState(WebSettings.PluginState.ON);
 		WebChromeClient webChromeClient = new WebChromeClient();
 		mTestWebView.setWebChromeClient(webChromeClient);
 		mTestWebView.setWebChromeClient(new WebChromeClient() {
@@ -87,22 +84,7 @@ public class MainActivity extends Activity {
 			};
 		});
 
-		// web.getSettings().setPluginsEnabled(true);
-		/*
-		 * File f = new File(
-		 * "file:///storage/emulated/0/Android/data/com.example.test/files/Download/rbmDownloads.pdf"
-		 * ); Intent fileIntent = new Intent(Intent.ACTION_VIEW);
-		 * fileIntent.setDataAndType(Uri.fromFile(f), "application/pdf");
-		 * 
-		 * fileIntent .setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-		 * startActivity(fileIntent);
-		 */
-		// mTestWebView.getSettings().setLoadWithOverviewMode(overviewmode);
-		// mTestWebView.getSettings().setUseWideViewPort(viewport);
-
 		// these settings speed up page load into the webview
-		mTestWebView.getSettings().setRenderPriority(RenderPriority.HIGH);
-		// web.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
 		mTestWebView.setWebViewClient(new TestWebViewClient());
 
 		BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -110,8 +92,6 @@ public class MainActivity extends Activity {
 			public void onReceive(Context context, Intent intent) {
 				String action = intent.getAction();
 				if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action)) {
-					long downloadId = intent.getLongExtra(
-							DownloadManager.EXTRA_DOWNLOAD_ID, 0);
 					Query query = new Query();
 					query.setFilterById(enqueue);
 					Cursor c = dm.query(query);
@@ -124,15 +104,7 @@ public class MainActivity extends Activity {
 							String uriString = c
 									.getString(c
 											.getColumnIndex(DownloadManager.COLUMN_LOCAL_FILENAME));
-							Log.i("Vaibhavs", "Actual: " + uriString);
-							// uriString=Environment.getExternalStorageDirectory().getAbsolutePath()+"/Download/"+uriString;
-
-							// uriString=uriString.substring(7);
-
-							Log.i("Vaibhavs", "HardCoded:" + uriString);
-
 							File f = new File(uriString);
-							Log.i("Vaibhavs", "file exists: " + f.exists());
 							if (f.exists()) {
 								Intent fileIntent = new Intent(
 										Intent.ACTION_VIEW);
@@ -151,7 +123,6 @@ public class MainActivity extends Activity {
 
 		registerReceiver(receiver, new IntentFilter(
 				DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-
 	}
 
 	public static String readFully(InputStream inputStream) throws IOException {
@@ -190,50 +161,65 @@ public class MainActivity extends Activity {
 				SslError error) {
 			handler.proceed();
 		}
-		
+
 		@Override
 		public void onReceivedHttpAuthRequest(WebView view,
-				HttpAuthHandler handler, String host, String realm) {
+				final HttpAuthHandler handler, String host, String realm) {
 
-			String[] credentials = view.getHttpAuthUsernamePassword(host, realm);
-		    if (credentials != null) {
-		        Log.d("Ameya", "Setting credentials for user : " + credentials[0]);
-		        handler.proceed(credentials[0], credentials[1]);
-		    } else {
-		        Log.d("Ameya", "No credentials found");
-		        view.setHttpAuthUsernamePassword(host, realm, "a929261", "Bestbuy8");
-		    }
-			super.onReceivedHttpAuthRequest(view, handler, host, realm);
+			if (username != null && password != null) {
+
+				handler.proceed(username, password);
+			} else {
+
+				LayoutInflater li = LayoutInflater.from(context);
+				View promptsView = li.inflate(R.layout.layout_login_prompt,
+						null);
+
+				AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
+						context);
+
+				// set prompts.xml to alertdialog builder
+				alertDialogBuilder.setView(promptsView);
+
+				final EditText edittext_username = (EditText) promptsView
+						.findViewById(R.id.edittext_username);
+
+				final EditText edittext_password = (EditText) promptsView
+						.findViewById(R.id.edittext_password);
+
+				alertDialogBuilder
+						.setCancelable(false)
+						.setPositiveButton("OK",
+								new DialogInterface.OnClickListener() {
+									public void onClick(DialogInterface dialog,
+											int id) {
+										username = edittext_username.getText()
+												.toString();
+										password = edittext_password.getText()
+												.toString();
+										handler.cancel();
+										mTestWebView.goBack();
+
+									}
+								})
+						.setNegativeButton("Cancel",
+								new DialogInterface.OnClickListener() {
+									public void onClick(DialogInterface dialog,
+											int id) {
+										dialog.cancel();
+									}
+								});
+
+				// create alert dialog
+				AlertDialog alertDialog = alertDialogBuilder.create();
+
+				// show it
+				alertDialog.show();
+			}
 		}
-		
-//		@Override
-//		public void onReceivedClientCertRequest(WebView view,
-//				ClientCertRequest request) {
-//
-//			try {
-//
-//				byte der[] = readFully(
-//						MainActivity.this.getResources().openRawResource(
-//								R.raw.vmm_certificate)).getBytes();
-//
-//				ByteArrayInputStream derInputStream = new ByteArrayInputStream(
-//						der);
-//				CertificateFactory certificateFactory = CertificateFactory
-//						.getInstance("X.509");
-//				X509Certificate[] certificates = new X509Certificate[1];
-//
-//				certificates[0] = (X509Certificate) certificateFactory
-//						.generateCertificate(derInputStream);
-//				PrivateKey key = getPrivateKey(1, MainActivity.this);
-//				request.proceed(key, certificates);
-//
-//			} catch (Exception e) {
-//			}
-//		}
 
 		@Override
 		public void onPageFinished(WebView view, String url) {
-			Log.i("Vaibhavs", "onPageFinished: " + url);
 
 			progressDialog.dismiss();
 			super.onPageFinished(view, url);
@@ -242,7 +228,17 @@ public class MainActivity extends Activity {
 		@Override
 		public boolean shouldOverrideUrlLoading(WebView view, String url) {
 
-			Log.i("Vaibhavs", "shouldOverridingURl: " + url);
+			if (url.contains(".pdf") || url.contains(".PDF")) {
+				dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+				Request request = new Request(
+						Uri.parse("http://www.stat.berkeley.edu/~census/sample.pdf"));
+				request.setDestinationInExternalPublicDir(
+						Environment.DIRECTORY_DOWNLOADS, "newsample.pdf");
+				enqueue = dm.enqueue(request);
+
+				return false;
+			}
+
 			return super.shouldOverrideUrlLoading(view, url);
 
 		}
@@ -252,18 +248,6 @@ public class MainActivity extends Activity {
 			progressDialog = new ProgressDialog(MainActivity.this);
 			progressDialog.setMessage("Loading...");
 			progressDialog.show();
-
-//			if (url.contains(".pdf") || url.contains(".PDF")) {
-//				dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-//				Request request = new Request(Uri.parse(url));
-//				request.setDestinationInExternalPublicDir(
-//						Environment.DIRECTORY_DOWNLOADS, "newsample.pdf");
-//				enqueue = dm.enqueue(request);
-//			}
-//			Log.i("Vaibhavs", "onPageStarted: "
-//					+ Environment.getExternalStorageDirectory()
-//							.getAbsolutePath());
-
 			super.onPageStarted(view, url, favicon);
 		}
 	}
@@ -291,6 +275,15 @@ public class MainActivity extends Activity {
 		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.main, menu);
 		return true;
+	}
+
+	@Override
+	public void onBackPressed() {
+
+		if (this.mTestWebView.canGoBack())
+			this.mTestWebView.goBack();
+		else
+			super.onBackPressed();
 	}
 
 }

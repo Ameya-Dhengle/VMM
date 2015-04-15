@@ -24,9 +24,10 @@ public class ActivitySplash extends Activity {
 						MainActivity.class);
 				intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 				startActivity(intent);
+				finish();
 
 			}
-		}, 4000);
+		}, 1000);
 	}
 
 }
